@@ -1,0 +1,41 @@
+Need one game object to be responsible for the network, shouldn't be destroyed. We have an empty called NetworkManager for this purpose. We add the Network component called NetworkManager to it. This script make the empty run in background and not get destroyed on load. Add the NetworkManagerHUD script to get a GUI.
+
+When a client connects to a server, spawn the PlayerPrefab (to hold that network connection, I guess). Set the PlayerPrefab under the Spawn Info tab in the Network Manager component. The guy makes the case that the PlayerPrefab shouldn't be visible because then we would equate seeing the object with the network connection. This doesn't work when the player dies or something, since Unity will have the Player object destroyed. We make an empty called PlayerObject.
+
+Add a Network Identity component to the PlayerObject. It's like a reference but universal over a network.
+
+EVERYTHING that isn't static that will be shared over the network will need a Network Identity.
+
+A problem arises in the first attempt. Each client needs to instantiate the PlayerUnits of each other connected client. Basically what is happening is that each connected device is making enough PlayerObjects for the number of devices connected, but they aren't connected to a corresponding device/client. We also shouldn't be doing "networky" stuff on PlayerObjects that don't belong to us.
+
+If we want an object to be aware of the Network, we need it to inherit from NetworkBehaviour instead of MonoBehaviour. This allows us to check if the object is the local PlayerObject or whether we have authority over an object.
+
+Make things appear on network with NetworkServer.Spawn(). Make a command that will actually do the instantiation and then call the command in Start().
+
+The server functions for an object are called commands. 
+
+[Command]
+void Cmd<rest of fn name>() {}
+Must start with Cmd
+
+Anything that can be spawned by the server needs to be in the list of registered spawnable prefabs.
+
+isLocalPlayer is only set to true for the object that is directly spawned for your network connection. Objects instantiated on the server need to be told which client connection owns them.
+
+Arguments to commands can be primitives or strings (or something like that), but for more complicated stuff you have to (probably) serialize it. Idk, he just said it doesn't work out of the box so I assume he means serializing.
+
+SyncVar makes it really easy. No need to do a RPC, but still need for client to inform server of change. Basically an RPC is being made and run for you without you doing anything.
+
+[SyncVar(hook="OnPlayerNameChanged")] 
+Means that when the syncvar variable changes, run the function called OnPlayerNameChanged.
+WARNING: the local value will not automatically get updated. You can change the value when you're inside the hook function (maybe) but that also could have weird effects. Be cautious.
+
+Maybe RPC's would be better if you need to figure out exactly who initiated the request.
+
+It may be easier to use the RPC's with our thing cause it's a board game, we wouldn't have to update the local position before the RPC comes back to us. Mainly because it's a board game and things don't have to be fast.
+
+- don't update what hasn't changed
+- use prediction when possible
+- figure out what is deterministic (EVERYTHING, in our case)
+
+Latency is the main thing that we want to minimize. It's related to the number of hops and the distance and stuff like that.
